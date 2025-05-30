@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מעקב השקייה לצמחים</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      padding: 20px;
+      direction: rtl;
+    }
+    .plant {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .plant-info {
+      flex-grow: 1;
+    }
+    .plant-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .watering-note {
+      font-size: 0.9em;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .bar {
+      height: 20px;
+      background: green;
+      border-radius: 4px;
+      transition: width 0.3s, background 0.3s;
+    }
+    .bar-wrapper {
+      background: #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .button {
+      background: #4CAF50;
+      color: white;
+      padding: 5px 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-inline-end: 10px;
+    }
+    .button:hover {
+      background: #45a049;
+    }
+    .undo {
+      background: #f44336;
+    }
+    .undo:hover {
+      background: #d32f2f;
+    }
+    .timestamp {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
+    .plant-img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>מעקב השקיה לצמחים</h1>
+  <div id="plant-list"></div>
+
+  <script>
+    const plants = [
+      { name: "נענע", interval: 2, img: "imgs/mint", note: "השקיה כל יומיים" },
+      { name: "תימין", interval: 5, img: "imgs/timin", note: "השקיה פעמיים בשבוע" },
+      { name: "גרניום", interval: 3, img: "imgs/geranium", note: "השקיה כל שלושה ימים" },
+      { name: "פטל", interval: 2, img: "imgs/raspberry", note: "השקיה כל יומיים" },
+      { name: "תאנה", interval: 3, img: "imgs/fig", note: "השקיה כל שלושה ימים" },
+      { name: "זעתר", interval: 5, img: "imgs/zaatar", note: "השקיה פעמיים בשבוע" },
+      { name: "רוזמרין", interval: 5, img: "imgs/rosemary", note: "השקיה פעמיים בשבוע" },
+      { name: "גפנים", interval: 2, img: "imgs/grapes", note: "השקיה כל יומיים" },
+      { name: "פסיפלורה", interval: 2, img: "imgs/passionfruit", note: "השקיה כל יומיים" },
+      { name: "הדס", interval: 4, img: "imgs/hadas", note: "השקיה כל 4 ימים" },
+      { name: "יסמין כוזב", interval: 4, img: "imgs/jasmin", note: "השקיה כל 4 ימים" },
+      { name: "לוונדר", interval: 5, img: "imgs/levander", note: "השקיה פעמיים בשבוע" },
+      { name: "זית", interval: 6, img: "imgs/olives", note: "השקיה פעם בשבוע" },
+      { name: "עגבניות שרי", interval: 1, img: "imgs/tomato", note: "השקיה יומית" }
+    ];
+
+    function saveData(data) {
+      try {
+        localStorage.setItem('wateringData', JSON.stringify(data));
+      } catch (e) {
+        console.error("Failed to save data:", e);
+      }
+    }
+
+    function loadData() {
+      try {
+        return JSON.parse(localStorage.getItem('wateringData') || '{}');
+      } catch (e) {
+        console.warn("No saved data or fetch error", e);
+        return {};
+      }
+    }
+
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleString('he-IL');
+    }
+
+    function createPlantCard(plant) {
+      const now = Date.now();
+      const msPerDay = 86400000;
+      const lastWatered = wateringData[plant.name] || 0;
+      const daysPassed = lastWatered ? (now - lastWatered) / msPerDay : Infinity;
+      const percent = lastWatered ? Math.max(0, 1 - daysPassed / plant.interval) : 0;
+      const barColor = percent > 0.5 ? 'green' : (percent > 0.2 ? 'orange' : 'red');
+
+      const card = document.createElement('div');
+      card.className = 'plant';
+      card.setAttribute('data-name', plant.name);
+
+      const img = document.createElement('img');
+      img.src = `${plant.img}.png`;
+      img.alt = plant.name;
+      img.className = 'plant-img';
+
+      const info = document.createElement('div');
+      info.className = 'plant-info';
+
+      const title = document.createElement('div');
+      title.className = 'plant-name';
+      title.innerText = plant.name;
+
+      const note = document.createElement('div');
+      note.className = 'watering-note';
+      note.innerText = plant.note;
+
+      const barWrapper = document.createElement('div');
+      barWrapper.className = 'bar-wrapper';
+
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.width = (percent * 100) + '%';
+      bar.style.background = barColor;
+
+      barWrapper.appendChild(bar);
+
+      const timestamp = document.createElement('div');
+      timestamp.className = 'timestamp';
+      if (lastWatered) {
+        const timeLeftMs = Math.max(0, (plant.interval * msPerDay) - (now - lastWatered));
+        const hours = Math.floor(timeLeftMs / 3600000);
+        const minutes = Math.floor((timeLeftMs % 3600000) / 60000);
+        timestamp.innerText = `הושקה לאחרונה: ${formatDate(lastWatered)}\n(עוד ${hours} שעות ו-${minutes} דקות להשקיה)`;
+      } else {
+        timestamp.innerText = 'לא הושקה עדיין';
+      }
+
+      const button = document.createElement('button');
+      button.className = 'button';
+      button.innerText = 'השקיתי עכשיו';
+      button.onclick = () => {
+        wateringData[plant.name] = Date.now();
+        saveData(wateringData);
+        refreshUI();
+      };
+
+      const undoButton = document.createElement('button');
+      undoButton.className = 'button undo';
+      undoButton.innerText = 'ביטול';
+      undoButton.onclick = () => {
+        delete wateringData[plant.name];
+        saveData(wateringData);
+        refreshUI();
+      };
+
+      info.appendChild(title);
+      info.appendChild(note);
+      info.appendChild(barWrapper);
+      info.appendChild(button);
+      info.appendChild(undoButton);
+      info.appendChild(timestamp);
+
+      card.appendChild(img);
+      card.appendChild(info);
+
+      return card;
+    }
+
+    let wateringData = {};
+    const container = document.getElementById('plant-list');
+
+    function refreshUI() {
+      wateringData = loadData();
+      container.innerHTML = '';
+      plants.forEach(plant => {
+        const card = createPlantCard(plant);
+        container.appendChild(card);
+      });
+    }
+
+    refreshUI();
+  </script>
+</body>
+</html>
