@@ -67,6 +67,7 @@
       font-size: 0.9em;
       color: #666;
       margin-top: 5px;
+      white-space: pre-line;
     }
     .plant-img {
       width: 80px;
@@ -79,6 +80,16 @@
 </head>
 <body>
   <h1>מעקב השקיה לצמחים</h1>
+
+  <!-- דישון כללי -->
+  <div id="fertilizer-section" style="margin-bottom: 30px;">
+    <button class="button" onclick="fertilizeNow()">דישנתי היום</button>
+    <div id="fertilizer-info" class="timestamp"></div>
+    <div class="bar-wrapper">
+      <div id="fertilizer-bar" class="bar" style="width: 0%;"></div>
+    </div>
+  </div>
+
   <div id="plant-list"></div>
 
   <script>
@@ -97,9 +108,13 @@
       { name: "לוונדר", interval: 5, img: "imgs/levander", note: "השקיה פעמיים בשבוע" },
       { name: "גואייבה", interval: 2, img: "imgs/goyava", note: "השקיה כל יומיים " },
       { name: "זית", interval: 6, img: "imgs/olives", note: "השקיה פעם בשבוע" },
-      { name: "פלפל", interval: 1, img: "imgs/pilpel", note: "השקיה כל בשבוע" },
+      { name: "פלפל", interval: 1, img: "imgs/pilpel", note: "השקיה יומית" },
       { name: "עגבניות שרי", interval: 1, img: "imgs/tomato", note: "השקיה יומית" }
     ];
+
+    let wateringData = {};
+    const container = document.getElementById('plant-list');
+    const msPerDay = 86400000;
 
     function saveData(data) {
       try {
@@ -125,7 +140,6 @@
 
     function createPlantCard(plant) {
       const now = Date.now();
-      const msPerDay = 86400000;
       const lastWatered = wateringData[plant.name] || 0;
       const daysPassed = lastWatered ? (now - lastWatered) / msPerDay : Infinity;
       const percent = lastWatered ? Math.max(0, 1 - daysPassed / plant.interval) : 0;
@@ -203,16 +217,55 @@
       return card;
     }
 
-    let wateringData = {};
-    const container = document.getElementById('plant-list');
+    // דישון כללי
+    const FERTILIZER_KEY = 'lastFertilized';
+    const FERTILIZER_INTERVAL_DAYS = 14;
+
+    function fertilizeNow() {
+      localStorage.setItem(FERTILIZER_KEY, Date.now().toString());
+      updateFertilizerUI();
+    }
+
+    function updateFertilizerUI() {
+      const now = Date.now();
+      const lastFertilized = parseInt(localStorage.getItem(FERTILIZER_KEY) || "0");
+      const daysPassed = lastFertilized ? (now - lastFertilized) / msPerDay : Infinity;
+      const percent = lastFertilized ? Math.max(0, 1 - (daysPassed / FERTILIZER_INTERVAL_DAYS)) : 0;
+      const barColor = percent > 0.5 ? 'green' : (percent > 0.2 ? 'orange' : 'red');
+
+      const bar = document.getElementById('fertilizer-bar');
+      bar.style.width = (percent * 100) + '%';
+      bar.style.background = barColor;
+
+      const info = document.getElementById('fertilizer-info');
+      if (lastFertilized) {
+        const timeLeftMs = Math.max(0, (FERTILIZER_INTERVAL_DAYS * msPerDay) - (now - lastFertilized));
+        const days = Math.floor(timeLeftMs / msPerDay);
+        const hours = Math.floor((timeLeftMs % msPerDay) / 3600000);
+        info.innerText = `הדישון האחרון: ${formatDate(lastFertilized)}\n(עוד ${days} ימים ו-${hours} שעות לדישון הבא)`;
+      } else {
+        info.innerText = 'לא דושן עדיין';
+      }
+    }
 
     function refreshUI() {
       wateringData = loadData();
       container.innerHTML = '';
-      plants.forEach(plant => {
+      const now = Date.now();
+
+      const sortedPlants = plants.map(plant => {
+        const lastWatered = wateringData[plant.name] || 0;
+        const daysPassed = lastWatered ? (now - lastWatered) / msPerDay : Infinity;
+        const percent = lastWatered ? Math.max(0, 1 - daysPassed / plant.interval) : 0;
+        return { ...plant, urgency: percent };
+      }).sort((a, b) => a.urgency - b.urgency);
+
+      sortedPlants.forEach(plant => {
         const card = createPlantCard(plant);
         container.appendChild(card);
       });
+
+      updateFertilizerUI();
     }
 
     refreshUI();
